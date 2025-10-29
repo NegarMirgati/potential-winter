@@ -24,7 +24,9 @@ router = APIRouter(
 
 @router.post("/", response_model=schemas.City)
 async def upsert_country_code(
-    city_data: schemas.CityCreate, db: Session = Depends(get_db)
+    city_data: schemas.CityCreate,
+    db: Session = Depends(get_db),
+    cache=Depends(get_cache),
 ):
     db_city = db.query(models.City).filter(models.City.city == city_data.city).first()
     if db_city:
@@ -35,7 +37,8 @@ async def upsert_country_code(
 
     db.commit()
     db.refresh(db_city)
-
+    # NEW: Update the cache after upsert
+    await set_cached(cache, db_city.city, db_city.country_code)
     return db_city
 
 

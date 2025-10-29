@@ -11,7 +11,7 @@ engine = create_engine(settings.DATABASE_URL)
 SessionLocal = sessionmaker(bind=engine)
 
 
-def seed_cities(csv_path="data/CountryCode-City.csv"):
+def seed_cities(csv_path="app/data/CountryCode-City.csv"):
     session = SessionLocal()
     try:
         with open(csv_path, newline="", encoding="utf-8") as f:
