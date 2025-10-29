@@ -47,10 +47,10 @@ async def get_country_code(
     city: str, db: Session = Depends(get_db), cache=Depends(get_cache)
 ):
     start_time = time.perf_counter()
-    await cache.incr(TOTAL_COUNT_KEY)
 
     cached_record = await get_cached(cache, city)
     if cached_record:
+        await cache.incr(TOTAL_COUNT_KEY)
         await cache.incr(HIT_COUNT_KEY)
 
         total = int(await cache.get(TOTAL_COUNT_KEY) or 1)
@@ -71,10 +71,13 @@ async def get_country_code(
 
     db_city = db.query(models.City).filter(models.City.city == city).first()
     if not db_city:
+        # Do NOT increment TOTAL_COUNT_KEY here
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="City not found"
         )
 
+    # Only increment total count if city exists
+    await cache.incr(TOTAL_COUNT_KEY)
     await set_cached(cache, city, db_city.country_code)
 
     total = int(await cache.get(TOTAL_COUNT_KEY) or 1)
@@ -92,3 +95,54 @@ async def get_country_code(
         },
     )
     return {"country_code": db_city.country_code, "hit_percentage": hit_percentage}
+
+
+# async def get_country_code(
+#     city: str, db: Session = Depends(get_db), cache=Depends(get_cache)
+# ):
+#     start_time = time.perf_counter()
+#     await cache.incr(TOTAL_COUNT_KEY)
+
+#     cached_record = await get_cached(cache, city)
+#     if cached_record:
+#         await cache.incr(HIT_COUNT_KEY)
+
+#         total = int(await cache.get(TOTAL_COUNT_KEY) or 1)
+#         hits = int(await cache.get(HIT_COUNT_KEY) or 0)
+#         hit_percentage = round(hits / total * 100, 2)
+
+#         duration = time.perf_counter() - start_time
+#         await send_message(
+#             topic=settings.KAFKA_TOPIC,
+#             message={
+#                 "city": city,
+#                 "event": "hit",
+#                 "duration_ms": int(duration * 1000),
+#                 "hit_percentage": hit_percentage,
+#             },
+#         )
+#         return {"country_code": cached_record, "hit_percentage": hit_percentage}
+
+#     db_city = db.query(models.City).filter(models.City.city == city).first()
+#     if not db_city:
+#         raise HTTPException(
+#             status_code=status.HTTP_404_NOT_FOUND, detail="City not found"
+#         )
+
+#     await set_cached(cache, city, db_city.country_code)
+
+#     total = int(await cache.get(TOTAL_COUNT_KEY) or 1)
+#     hits = int(await cache.get(HIT_COUNT_KEY) or 0)
+#     hit_percentage = round(hits / total * 100, 2)
+
+#     duration = time.perf_counter() - start_time
+#     await send_message(
+#         topic=settings.KAFKA_TOPIC,
+#         message={
+#             "city": city,
+#             "event": "miss",
+#             "duration_ms": int(duration * 1000),
+#             "hit_percentage": hit_percentage,
+#         },
+#     )
+#     return {"country_code": db_city.country_code, "hit_percentage": hit_percentage}
